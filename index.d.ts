@@ -64,6 +64,7 @@ export let isNativeAccelerationEnabled: boolean
 export class Packr extends Unpackr {
 	offset: number;
 	position: number;
+	buffer: Buffer | Uint8Array;
 	pack(value: any, encodeOptions?: number): Buffer
 	encode(value: any, encodeOptions?: number): Buffer
 	useBuffer(buffer: Buffer | Uint8Array): void;

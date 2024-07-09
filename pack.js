@@ -832,6 +832,12 @@ export class Packr extends Unpackr {
 	get position() {
 		return position;
 	}
+	set buffer (buffer) {
+		target = buffer;
+	}
+	get buffer () {
+		return target;
+	}
 	clearSharedData() {
 		if (this.structures)
 			this.structures = []
