@@ -19,12 +19,14 @@ export interface Options {
 	bundleStrings?: boolean
 	useTimestamp32?: boolean
 	largeBigIntToFloat?: boolean
+	largeBigIntToString?: boolean
 	useBigIntExtension?: boolean
 	encodeUndefinedAsNil?: boolean
 	maxSharedStructures?: number
 	maxOwnStructures?: number
 	mapAsEmptyObject?: boolean
 	setAsEmptyObject?: boolean
+	allowArraysInMapKeys?: boolean
 	writeFunction?: () => any
 	/** @deprecated use int64AsType: 'number' */
 	int64AsNumber?: boolean

@@ -703,7 +703,7 @@ suite('msgpackr basic tests', function() {
 			}
 	})
 
-	test('moreTyesp: Error with causes', function() {
+	test('moreTypes: Error with causes', function() {
 		const object = {
 			error: new Error('test'),
 			errorWithCause: new Error('test-1', { cause: new Error('test-2')}),
@@ -1153,6 +1153,13 @@ suite('msgpackr basic tests', function() {
 		serialized = packr.pack(tooBigInt)
 		deserialized = unpack(serialized)
 		assert.isTrue(deserialized.tooBig > 2n**65n)
+
+		packr = new Packr({
+			largeBigIntToString: true
+		})
+		serialized = packr.pack(tooBigInt)
+		deserialized = unpack(serialized)
+		assert.equal(deserialized.tooBig, (2n**66n).toString())
 	})
 
 	test('roundFloat32', function() {
@@ -1191,6 +1198,18 @@ suite('msgpackr basic tests', function() {
 		assert.deepEqual(deserialized, data)
 	})
 
+	test('arrays in map keys', function() {
+		const msgpackr = new Packr({ mapsAsObjects: true, allowArraysInMapKeys: true });
+
+		const map = new Map();
+		map.set([1, 2, 3], 1);
+		map.set([1, 2, ['foo', 3.14]], 2);
+
+		const packed = msgpackr.pack(map);
+		const unpacked = msgpackr.unpack(packed);
+		assert.deepEqual(unpacked, { '1,2,3': 1, '1,2,foo,3.14': 2 });
+	})
+
 	test('utf16 causing expansion', function() {
 		this.timeout(10000)
 		let data = {fixstr: 'ᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝ', str8:'ᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝ'}
@@ -1224,6 +1243,54 @@ suite('msgpackr basic tests', function() {
 		const serialized = pack(new Serializable)
 		const deserialized = unpack(serialized)
 		assert.deepStrictEqual(deserialized, { someData: [1, 2, 3, 4] })
+	})
+	test('skip values', function () {
+		var data = {
+			data: [
+				{ a: 1, name: 'one', type: 'odd', isOdd: true },
+				{ a: 2, name: 'two', type: 'even', isOdd: undefined },
+				{ a: 3, name: 'three', type: 'odd', isOdd: true },
+				{ a: 4, name: 'four', type: 'even', isOdd: null},
+				{ a: 5, name: 'five', type: 'odd', isOdd: true },
+				{ a: 6, name: 'six', type: 'even', isOdd: null }
+			],
+			description: 'some names',
+			types: ['odd', 'even'],
+			convertEnumToNum: [
+				{ prop: 'test' },
+				{ prop: 'test' },
+				{ prop: 'test' },
+				{ prop: 1 },
+				{ prop: 2 },
+				{ prop: [undefined, null] },
+				{ prop: null }
+			]
+		}
+		var expected = {
+			data: [
+				{ a: 1, name: 'one', type: 'odd', isOdd: true },
+				{ a: 2, name: 'two', type: 'even' },
+				{ a: 3, name: 'three', type: 'odd', isOdd: true },
+				{ a: 4, name: 'four', type: 'even', },
+				{ a: 5, name: 'five', type: 'odd', isOdd: true },
+				{ a: 6, name: 'six', type: 'even' }
+			],
+			description: 'some names',
+			types: ['odd', 'even'],
+			convertEnumToNum: [
+				{ prop: 'test' },
+				{ prop: 'test' },
+				{ prop: 'test' },
+				{ prop: 1 },
+				{ prop: 2 },
+				{ prop: [undefined, null] },
+				{}
+			]
+		}
+		let packr = new Packr({ useRecords: false, skipValues: [undefined, null] })
+		var serialized = packr.pack(data)
+		var deserialized = packr.unpack(serialized)
+		assert.deepEqual(deserialized, expected)
 	})
 })
 suite('msgpackr performance tests', function(){

@@ -184,13 +184,16 @@ The following options properties can be provided to the Packr or Unpackr constru
 * `useTimestamp32` - Encode JS `Date`s in 32-bit format when possible by dropping the milliseconds. This is a more efficient encoding of dates. You can also cause dates to use 32-bit format by manually setting the milliseconds to zero (`date.setMilliseconds(0)`).
 * `sequential` - Encode structures in serialized data, and reference previously encoded structures with expectation that decoder will read the encoded structures in the same order as encoded, with `unpackMultiple`.
 * `largeBigIntToFloat` - If a bigint needs to be encoded that is larger than will fit in 64-bit integers, it will be encoded as a float-64 (otherwise will throw a RangeError).
+* `largeBigIntToString` - If a bigint needs to be encoded that is larger than will fit in 64-bit integers, it will be encoded as a string (otherwise will throw a RangeError).
 * `useBigIntExtension` - If a bigint needs to be encoded that is larger than will fit in 64-bit integers, it will be encoded using a custom extension that supports up to about 1000-bits of integer precision.
 * `encodeUndefinedAsNil` - Encodes a value of `undefined` as a MessagePack `nil`, the same as a `null`.
-* `int64AsType` - This will decode uint64 and int64 numbers as the specified type. The type can be `bigint` (default), `number`,  `string`, or `auto` (where range [-2^53...2^53] is represented by number and everything else by a bigint). 
+* `int64AsType` - This will decode uint64 and int64 numbers as the specified type. The type can be `bigint` (default), `number`,  `string`, or `auto` (where range [-2^53...2^53] is represented by number and everything else by a bigint).
+* `skipValues` - This can be an array of property values that will indicate properties that should be skipped when serializing objects. For example, to mimic `JSON.stringify`'s behavior of skipping properties with a value of `undefined`, you can provide `skipValues: [undefined]`. Note, that this will only apply to serializing objects as standard MessagePack maps, not to records. Also, the array is checked by calling the `include` method, so you can provide an object with an `includes` if you want a custom function to skip values. 
 * `onInvalidDate` - This can be provided as function that will be called when an invalid date is provided. The function can throw an error, or return a value that will be encoded in place of the invalid date. If not provided, an invalid date will be encoded as an invalid timestamp (which decodes with msgpackr back to an invalid date).
 * `writeFunction` - This can be provided as function that will be called when a function is encountered. The function can throw an error, or return a value that will be encoded in place of the function. If not provided, a function will be encoded as undefined (similar to `JSON.stringify`).
 * `mapAsEmptyObject` - Encodes JS `Map`s as empty objects (for back-compat with older libraries).
 * `setAsEmptyObject` - Encodes JS `Set`s as empty objects (for back-compat with older libraries).
+* `allowArraysInMapKeys` - Allows arrays to be used as keys in Maps, as long as all elements are strings, numbers, booleans, or bigints. When enabled, such arrays are flattened and converted to a string representation.
 
 ### 32-bit Float Options
 By default all non-integer numbers are serialized as 64-bit float (double). This is fast, and ensures maximum precision. However, often real-world data doesn't not need 64-bits of precision, and using 32-bit encoding can be much more space efficient. There are several options that provide more efficient encodings. Using the decimal rounding options for encoding and decoding provides lossless storage of common decimal representations like 7.99, in more efficient 32-bit format (rather than 64-bit). The `useFloat32` property has several possible options, available from the module as constants:
@@ -271,7 +274,7 @@ addExtension({
 	pack(instance) {
 		// define how your custom class should be encoded
 		return Buffer.from([instance.myData]); // return a buffer
-	}
+	},
 	unpack(buffer) {
 		// define how your custom class should be decoded
 		let instance = new MyCustomClass();

@@ -28,7 +28,7 @@ export class Packr extends Unpackr {
 		let structures
 		let referenceMap
 		let encodeUtf8 = ByteArray.prototype.utf8Write ? function(string, position) {
-			return target.utf8Write(string, position, 0xffffffff)
+			return target.utf8Write(string, position, target.byteLength - position)
 		} : (textEncoder && textEncoder.encodeInto) ?
 			function(string, position) {
 				return textEncoder.encodeInto(string, target.subarray(position)).written
@@ -536,18 +536,20 @@ export class Packr extends Unpackr {
 					if (this.largeBigIntToFloat) {
 						target[position++] = 0xcb
 						targetView.setFloat64(position, Number(value))
-					} else if (this.useBigIntExtension && value < 2n**(1023n) && value > -(2n**(1023n))) {
+					} else if (this.largeBigIntToString) {
+						return pack(value.toString());
+					} else if (this.useBigIntExtension && value < BigInt(2)**BigInt(1023) && value > -(BigInt(2)**BigInt(1023))) {
 						target[position++] = 0xc7
 						position++;
 						target[position++] = 0x42 // "B" for BigInt
 						let bytes = [];
 						let alignedSign;
 						do {
-							let byte = value & 0xffn;
-							alignedSign = (byte & 0x80n) === (value < 0n ? 0x80n : 0n);
+							let byte = value & BigInt(0xff);
+							alignedSign = (byte & BigInt(0x80)) === (value < BigInt(0) ? BigInt(0x80) : BigInt(0));
 							bytes.push(byte);
-							value >>= 8n;
-						} while (!((value === 0n || value === -1n) && alignedSign));
+							value >>= BigInt(8);
+						} while (!((value === BigInt(0) || value === BigInt(-1)) && alignedSign));
 						target[position-2] = bytes.length;
 						for (let i = bytes.length; i > 0;) {
 							target[position++] = Number(bytes[--i]);
@@ -555,7 +557,8 @@ export class Packr extends Unpackr {
 						return
 					} else {
 						throw new RangeError(value + ' was too large to fit in MessagePack 64-bit integer format, use' +
-							' useBigIntExtension or set largeBigIntToFloat to convert to float-64')
+							' useBigIntExtension, or set largeBigIntToFloat to convert to float-64, or set' +
+							' largeBigIntToString to convert to string')
 					}
 				}
 				position += 8
@@ -572,9 +575,19 @@ export class Packr extends Unpackr {
 			}
 		}
 
-		const writePlainObject = (this.variableMapSize || this.coercibleKeyAsNumber) ? (object) => {
+		const writePlainObject = (this.variableMapSize || this.coercibleKeyAsNumber || this.skipValues) ? (object) => {
 			// this method is slightly slower, but generates "preferred serialization" (optimally small for smaller objects)
-			let keys = Object.keys(object)
+			let keys;
+			if (this.skipValues) {
+				keys = [];
+				for (let key in object) {
+					if ((typeof object.hasOwnProperty !== 'function' || object.hasOwnProperty(key)) &&
+						!this.skipValues.includes(object[key]))
+						keys.push(key);
+				}
+			} else {
+				keys = Object.keys(object)
+			}
 			let length = keys.length
 			if (length < 0x10) {
 				target[position++] = 0x80 | length
@@ -614,6 +627,10 @@ export class Packr extends Unpackr {
 					pack(object[key])
 					size++
 				}
+			}
+			if (size > 0xffff) {
+				throw new Error('Object is too large to serialize with fast 16-bit map size,' +
+				' use the "variableMapSize" option to serialize this object');
 			}
 			target[objectOffset++ + start] = size >> 8
 			target[objectOffset + start] = size & 0xff
@@ -693,7 +710,7 @@ export class Packr extends Unpackr {
 				}
 		}
 
-		// craete reference to useRecords if useRecords is a function
+		// create reference to useRecords if useRecords is a function
 		const checkUseRecords = typeof this.useRecords == 'function' && this.useRecords;
 
 		const writeObject = checkUseRecords ? (object) => {
@@ -823,7 +840,7 @@ export class Packr extends Unpackr {
 	useBuffer(buffer) {
 		// this means we are finished using our own buffer and we can write over it safely
 		target = buffer
-		targetView = new DataView(target.buffer, target.byteOffset, target.byteLength)
+		target.dataView || (target.dataView = new DataView(target.buffer, target.byteOffset, target.byteLength))
 		position = 0
 	}
 	set position (value) {
@@ -843,12 +860,6 @@ export class Packr extends Unpackr {
 			this.structures = []
 		if (this.typedStructs)
 			this.typedStructs = []
-	}
-}
-
-function copyBinary(source, target, targetOffset, offset, endOffset) {
-	while (offset < endOffset) {
-		target[targetOffset++] = source[offset++]
 	}
 }
 
